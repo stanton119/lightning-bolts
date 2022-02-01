@@ -4,6 +4,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unReleased] - 2021-MM-DD
+
+### Added
+
+
+### Changed
+
+
+### Deprecated
+
+
+### Removed
+
+
+### Fixed
+
+
+## [0.5.0] - 2021-12-20
+
+### Added
+
+- Added YOLO model ([#552](https://github.com/PyTorchLightning/pytorch-lightning-bolts/pull/552))
+- Added `SRGAN`, `SRImageLoggerCallback`, `TVTDataModule`, `SRCelebA`, `SRMNIST`, `SRSTL10` ([#466](https://github.com/PyTorchLightning/pytorch-lightning-bolts/pull/466))
+- Added nn.Module support for FasterRCNN backbone ([#661](https://github.com/PyTorchLightning/lightning-bolts/pull/661))
+- Added `RetinaNet` with torchvision backbones ([#529](https://github.com/PyTorchLightning/lightning-bolts/pull/529))
+- Added Python 3.9 support ([#786](https://github.com/PyTorchLightning/lightning-bolts/pull/786))
+
+### Changed
+
+- VAE now uses deterministic KL divergence during training, previously estimated KL divergence by random sampling ([#760](https://github.com/PyTorchLightning/lightning-bolts/pull/760))
+
+### Removed
+
+- Removed PyTorch 1.6 support ([#786](https://github.com/PyTorchLightning/lightning-bolts/pull/786))
+- Removed Python 3.6 support ([#785](https://github.com/PyTorchLightning/lightning-bolts/pull/785))
+
+### Fixed
+
+- Fixed doctest fails with ImportError: cannot import name 'Env' from 'gym' ([#751](https://github.com/PyTorchLightning/lightning-bolts/pull/751))
+- Fixed MoCo v2 missing Cosine Annealing learning scheduler ([#757](https://github.com/PyTorchLightning/lightning-bolts/pull/757))
+
+
+## [0.4.0] - 2021-09-09
+
+### Added
+
+- Added Soft Actor Critic (SAC) Model ([#627](https://github.com/PyTorchLightning/lightning-bolts/pull/627))
+- Added `EMNISTDataModule`, `BinaryEMNISTDataModule`, and `BinaryEMNIST` dataset ([#676](https://github.com/PyTorchLightning/lightning-bolts/pull/676))
+- Added Advantage Actor-Critic (A2C) Model ([#598](https://github.com/PyTorchLightning/lightning-bolts/pull/598))
+- Added Torch ORT Callback ([#720](https://github.com/PyTorchLightning/lightning-bolts/pull/720))
+- Added SparseML Callback ([#724](https://github.com/PyTorchLightning/lightning-bolts/pull/724))
+
+### Changed
+
+- Changed the default values `pin_memory=False`, `shuffle=False` and `num_workers=16` to `pin_memory=True`, `shuffle=True` and `num_workers=0` of datamodules ([#701](https://github.com/PyTorchLightning/lightning-bolts/pull/701))
+- Supporting deprecated attribute usage ([#699](https://github.com/PyTorchLightning/lightning-bolts/pull/699))
+
+### Fixed
+
+- Fixed ImageNet val loader to use val transform instead of train transform ([#713](https://github.com/PyTorchLightning/lightning-bolts/pull/713))
+- Fixed the MNIST download giving HTTP 404 with `torchvision>=0.9.1` ([#674](https://github.com/PyTorchLightning/lightning-bolts/pull/674))
+- Removed momentum updating from val step and add separate val queue ([#631](https://github.com/PyTorchLightning/lightning-bolts/pull/631))
+- Fixed moving the queue to GPU when resuming checkpoint for SwAV model ([#684](https://github.com/PyTorchLightning/lightning-bolts/pull/684))
+- Fixed FP16 support with vision GPT model ([#694](https://github.com/PyTorchLightning/lightning-bolts/pull/694))
+- Removing bias from linear model regularisation ([#669](https://github.com/PyTorchLightning/lightning-bolts/pull/669))
+- Fixed CPC module issue ([#680](https://github.com/PyTorchLightning/lightning-bolts/pull/680))
+
 
 ## [0.3.4] - 2021-06-17
 
@@ -71,8 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     [#323](https://github.com/PyTorchLightning/lightning-bolts/pull/323))
 - Added data monitor callbacks `ModuleDataMonitor` and `TrainingDataMonitor` ([#285](https://github.com/PyTorchLightning/lightning-bolts/pull/285))
 - Added DCGAN module ([#403](https://github.com/PyTorchLightning/lightning-bolts/pull/403))
-- Added `VisionDataModule` as parent class for `BinaryMNISTDataModule`, `CIFAR10DataModule`, `FashionMNISTDataModule`,
-  and `MNISTDataModule` ([#400](https://github.com/PyTorchLightning/lightning-bolts/pull/400))
+- Added `VisionDataModule` as parent class for `BinaryMNISTDataModule`, `CIFAR10DataModule`, `FashionMNISTDataModule`, and `MNISTDataModule` ([#400](https://github.com/PyTorchLightning/lightning-bolts/pull/400))
 - Added GIoU loss ([#347](https://github.com/PyTorchLightning/lightning-bolts/pull/347))
 - Added IoU loss ([#469](https://github.com/PyTorchLightning/lightning-bolts/pull/469))
 - Added semantic segmentation model `SemSegment` with `UNet` backend ([#259](https://github.com/PyTorchLightning/lightning-bolts/pull/259))

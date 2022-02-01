@@ -4,6 +4,7 @@ from typing import Any, Tuple
 import numpy as np
 import torch
 from pytorch_lightning import LightningDataModule
+from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 
 from pl_bolts.utils import _SKLEARN_AVAILABLE
@@ -16,8 +17,7 @@ else:  # pragma: no cover
 
 
 class SklearnDataset(Dataset):
-    """
-    Mapping between numpy (or sklearn) datasets to PyTorch datasets.
+    """Mapping between numpy (or sklearn) datasets to PyTorch datasets.
 
     Example:
         >>> from sklearn.datasets import load_diabetes
@@ -64,8 +64,7 @@ class SklearnDataset(Dataset):
 
 
 class TensorDataset(Dataset):
-    """
-    Prepare PyTorch tensor dataset for data loaders.
+    """Prepare PyTorch tensor dataset for data loaders.
 
     Example:
         >>> from pl_bolts.datamodules import TensorDataset
@@ -77,7 +76,7 @@ class TensorDataset(Dataset):
         10
     """
 
-    def __init__(self, X: torch.Tensor, y: torch.Tensor, X_transform: Any = None, y_transform: Any = None) -> None:
+    def __init__(self, X: Tensor, y: Tensor, X_transform: Any = None, y_transform: Any = None) -> None:
         """
         Args:
             X: PyTorch tensor
@@ -94,7 +93,7 @@ class TensorDataset(Dataset):
     def __len__(self) -> int:
         return len(self.X)
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx) -> Tuple[Tensor, Tensor]:
         x = self.X[idx].float()
         y = self.Y[idx]
 
@@ -108,8 +107,7 @@ class TensorDataset(Dataset):
 
 
 class SklearnDataModule(LightningDataModule):
-    """
-    Automatically generates the train, validation and test splits for a Numpy dataset. They are set up as
+    """Automatically generates the train, validation and test splits for a Numpy dataset. They are set up as
     dataloaders for convenience. Optionally, you can pass in your own validation and test splits.
 
     Example:
@@ -140,7 +138,7 @@ class SklearnDataModule(LightningDataModule):
         2
     """
 
-    name = 'sklearn'
+    name = "sklearn"
 
     def __init__(
         self,
@@ -152,11 +150,11 @@ class SklearnDataModule(LightningDataModule):
         y_test=None,
         val_split=0.2,
         test_split=0.1,
-        num_workers=2,
+        num_workers=0,
         random_state=1234,
         shuffle=True,
         batch_size: int = 16,
-        pin_memory=False,
+        pin_memory=True,
         drop_last=False,
         *args,
         **kwargs,
@@ -174,7 +172,7 @@ class SklearnDataModule(LightningDataModule):
             X, y = sk_shuffle(X, y, random_state=random_state)
         elif shuffle and not _SKLEARN_AVAILABLE:  # pragma: no cover
             raise ModuleNotFoundError(
-                'You want to use shuffle function from `scikit-learn` which is not installed yet.'
+                "You want to use shuffle function from `scikit-learn` which is not installed yet."
             )
 
         val_split = 0 if x_val is not None or y_val is not None else val_split
@@ -214,7 +212,7 @@ class SklearnDataModule(LightningDataModule):
             shuffle=self.shuffle,
             num_workers=self.num_workers,
             drop_last=self.drop_last,
-            pin_memory=self.pin_memory
+            pin_memory=self.pin_memory,
         )
         return loader
 
@@ -225,7 +223,7 @@ class SklearnDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             drop_last=self.drop_last,
-            pin_memory=self.pin_memory
+            pin_memory=self.pin_memory,
         )
         return loader
 
@@ -236,7 +234,7 @@ class SklearnDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             drop_last=self.drop_last,
-            pin_memory=self.pin_memory
+            pin_memory=self.pin_memory,
         )
         return loader
 

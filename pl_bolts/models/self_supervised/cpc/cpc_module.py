@@ -6,10 +6,10 @@ import math
 from argparse import ArgumentParser
 from typing import Optional
 
-import pytorch_lightning as pl
 import torch
+from pytorch_lightning import LightningModule, Trainer, seed_everything
 from pytorch_lightning.utilities import rank_zero_warn
-from torch import optim as optim
+from torch import optim
 
 from pl_bolts.datamodules.stl10_datamodule import STL10DataModule
 from pl_bolts.losses.self_supervised_learning import CPCTask
@@ -25,18 +25,17 @@ from pl_bolts.models.self_supervised.cpc.transforms import (
 from pl_bolts.utils.pretrained_weights import load_pretrained
 from pl_bolts.utils.self_supervised import torchvision_ssl_encoder
 
-__all__ = ['CPC_v2']
+__all__ = ["CPC_v2"]
 
 
-class CPC_v2(pl.LightningModule):
-
+class CPC_v2(LightningModule):
     def __init__(
         self,
-        encoder_name: str = 'cpc_encoder',
+        encoder_name: str = "cpc_encoder",
         patch_size: int = 8,
         patch_overlap: int = 4,
         online_ft: bool = True,
-        task: str = 'cpc',
+        task: str = "cpc",
         num_workers: int = 4,
         num_classes: int = 10,
         learning_rate: float = 1e-4,
@@ -79,28 +78,27 @@ class CPC_v2(pl.LightningModule):
             self.load_pretrained(encoder_name)
 
     def load_pretrained(self, encoder_name):
-        available_weights = {'resnet18'}
+        available_weights = {"resnet18"}
 
         if encoder_name in available_weights:
-            load_pretrained(self, f'CPC_v2-{encoder_name}')
+            load_pretrained(self, f"CPC_v2-{encoder_name}")
         elif encoder_name not in available_weights:
-            rank_zero_warn(f'{encoder_name} not yet available')
+            rank_zero_warn(f"{encoder_name} not yet available")
 
     def init_encoder(self):
         dummy_batch = torch.zeros((2, 3, self.hparams.patch_size, self.hparams.patch_size))
 
         encoder_name = self.hparams.encoder_name
-        if encoder_name == 'cpc_encoder':
+        if encoder_name == "cpc_encoder":
             return cpc_resnet101(dummy_batch)
-        else:
-            return torchvision_ssl_encoder(encoder_name, return_all_feature_maps=self.hparams.task == 'amdim')
+        return torchvision_ssl_encoder(encoder_name, return_all_feature_maps=self.hparams.task == "amdim")
 
     def __compute_final_nb_c(self, patch_size):
         dummy_batch = torch.zeros((2 * 49, 3, patch_size, patch_size))
         dummy_batch = self.encoder(dummy_batch)
 
         # other encoders return a list
-        if self.hparams.encoder != 'cpc_encoder':
+        if self.hparams.encoder_name != "cpc_encoder":
             dummy_batch = dummy_batch[0]
 
         dummy_batch = self.__recover_z_shape(dummy_batch, 2)
@@ -126,7 +124,7 @@ class CPC_v2(pl.LightningModule):
         Z = self.encoder(img_1)
 
         # non cpc resnets return a list
-        if self.hparams.encoder != 'cpc_encoder':
+        if self.hparams.encoder_name != "cpc_encoder":
             Z = Z[0]
 
         # (?) -> (b, -1, nb_feats, nb_feats)
@@ -139,7 +137,7 @@ class CPC_v2(pl.LightningModule):
         nce_loss = self.shared_step(batch)
 
         # result
-        self.log('train_nce_loss', nce_loss)
+        self.log("train_nce_loss", nce_loss)
         return nce_loss
 
     def validation_step(self, batch, batch_nb):
@@ -147,7 +145,7 @@ class CPC_v2(pl.LightningModule):
         nce_loss = self.shared_step(batch)
 
         # result
-        self.log('val_nce', nce_loss, prog_bar=True)
+        self.log("val_nce", nce_loss, prog_bar=True)
         return nce_loss
 
     def shared_step(self, batch):
@@ -184,22 +182,22 @@ class CPC_v2(pl.LightningModule):
     @staticmethod
     def add_model_specific_args(parent_parser):
         possible_resnets = [
-            'resnet18',
-            'resnet34',
-            'resnet50',
-            'resnet101',
-            'resnet152',
-            'resnext50_32x4d',
-            'resnext101_32x8d',
-            'wide_resnet50_2',
-            'wide_resnet101_2',
+            "resnet18",
+            "resnet34",
+            "resnet50",
+            "resnet101",
+            "resnet152",
+            "resnext50_32x4d",
+            "resnext101_32x8d",
+            "wide_resnet50_2",
+            "wide_resnet101_2",
         ]
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--online_ft', action='store_true')
-        parser.add_argument('--task', type=str, default='cpc')
-        parser.add_argument('--encoder', default='cpc_encoder', type=str, choices=possible_resnets)
+        parser.add_argument("--online_ft", action="store_true")
+        parser.add_argument("--task", type=str, default="cpc")
+        parser.add_argument("--encoder", default="cpc_encoder", type=str, choices=possible_resnets)
         # cifar10: 1e-5, stl10: 3e-5, imagenet: 4e-4
-        parser.add_argument('--learning_rate', type=float, default=1e-5)
+        parser.add_argument("--learning_rate", type=float, default=1e-5)
 
         return parser
 
@@ -209,27 +207,27 @@ def cli_main():
     from pl_bolts.datamodules import CIFAR10DataModule
     from pl_bolts.datamodules.ssl_imagenet_datamodule import SSLImagenetDataModule
 
-    pl.seed_everything(1234)
+    seed_everything(1234)
     parser = ArgumentParser()
-    parser = pl.Trainer.add_argparse_args(parser)
+    parser = Trainer.add_argparse_args(parser)
     parser = CPC_v2.add_model_specific_args(parser)
-    parser.add_argument('--dataset', default='cifar10', type=str)
-    parser.add_argument('--data_dir', default='.', type=str)
-    parser.add_argument('--meta_dir', default='.', type=str, help='path to meta.bin for imagenet')
-    parser.add_argument('--num_workers', default=8, type=int)
-    parser.add_argument('--hidden_mlp', default=2048, type=int, help='hidden layer dimension in projection head')
-    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument("--dataset", default="cifar10", type=str)
+    parser.add_argument("--data_dir", default=".", type=str)
+    parser.add_argument("--meta_dir", default=".", type=str, help="path to meta.bin for imagenet")
+    parser.add_argument("--num_workers", default=8, type=int)
+    parser.add_argument("--hidden_mlp", default=2048, type=int, help="hidden layer dimension in projection head")
+    parser.add_argument("--batch_size", type=int, default=128)
 
     args = parser.parse_args()
 
     datamodule = None
-    if args.dataset == 'cifar10':
+    if args.dataset == "cifar10":
         datamodule = CIFAR10DataModule.from_argparse_args(args)
         datamodule.train_transforms = CPCTrainTransformsCIFAR10()
         datamodule.val_transforms = CPCEvalTransformsCIFAR10()
         args.patch_size = 8
 
-    elif args.dataset == 'stl10':
+    elif args.dataset == "stl10":
         datamodule = STL10DataModule.from_argparse_args(args)
         datamodule.train_dataloader = datamodule.train_dataloader_mixed
         datamodule.val_dataloader = datamodule.val_dataloader_mixed
@@ -237,20 +235,20 @@ def cli_main():
         datamodule.val_transforms = CPCEvalTransformsSTL10()
         args.patch_size = 16
 
-    elif args.dataset == 'imagenet2012':
+    elif args.dataset == "imagenet2012":
         datamodule = SSLImagenetDataModule.from_argparse_args(args)
         datamodule.train_transforms = CPCTrainTransformsImageNet128()
         datamodule.val_transforms = CPCEvalTransformsImageNet128()
         args.patch_size = 32
 
     online_evaluator = SSLOnlineEvaluator(
-        drop_p=0.,
+        drop_p=0.0,
         hidden_dim=None,
         z_dim=args.hidden_mlp,
         num_classes=datamodule.num_classes,
         dataset=args.dataset,
     )
-    if args.dataset == 'stl10':
+    if args.dataset == "stl10":
         # 16 GB RAM - 64
         # 32 GB RAM - 144
         args.batch_size = 144
@@ -264,9 +262,9 @@ def cli_main():
         online_evaluator.to_device = to_device
 
     model = CPC_v2(**vars(args))
-    trainer = pl.Trainer.from_argparse_args(args, callbacks=[online_evaluator])
+    trainer = Trainer.from_argparse_args(args, callbacks=[online_evaluator])
     trainer.fit(model, datamodule=datamodule)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli_main()

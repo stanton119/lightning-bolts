@@ -7,17 +7,16 @@ from pytorch_lightning import LightningModule
 from pytorch_lightning.utilities import move_data_to_device
 
 from pl_bolts.callbacks.verification.base import VerificationBase
+from pl_bolts.utils import _PL_GREATER_EQUAL_1_4
 from tests import _MARK_REQUIRE_GPU
 
 
 class TrivialVerification(VerificationBase):
-
     def check(self, *args, **kwargs):
         return True
 
 
 class PyTorchModel(nn.Module):
-
     def __init__(self):
         super().__init__()
         self.layer = nn.Linear(5, 2)
@@ -27,7 +26,6 @@ class PyTorchModel(nn.Module):
 
 
 class LitModel(LightningModule):
-
     def __init__(self):
         super().__init__()
         self.example_input_array = None
@@ -37,13 +35,13 @@ class LitModel(LightningModule):
         return self.model(*args)
 
 
+@pytest.mark.skipif(not _PL_GREATER_EQUAL_1_4, reason="Verification test requires Lightning 1.4.")
 @pytest.mark.parametrize(
     "device",
-    [torch.device("cpu"),
-     pytest.param(torch.device("cuda", 0), marks=pytest.mark.skipif(**_MARK_REQUIRE_GPU))],
+    [torch.device("cpu"), pytest.param(torch.device("cuda", 0), marks=pytest.mark.skipif(**_MARK_REQUIRE_GPU))],
 )
 def test_verification_base_get_input_array(device):
-    """ Test that the base class calls the correct methods to transfer the input to the device the model is on. """
+    """Test that the base class calls the correct methods to transfer the input to the device the model is on."""
     model = PyTorchModel().to(device)
     verification = TrivialVerification(model)
     input_tensor = torch.rand(5)
@@ -61,7 +59,12 @@ def test_verification_base_get_input_array(device):
     verification = TrivialVerification(model)
 
     # for a LightningModule, user can rely on the example_input_array
-    with patch.object(model, "transfer_batch_to_device", wraps=model.transfer_batch_to_device) as mocked:
+    with patch.object(
+        model,
+        "transfer_batch_to_device",
+        autospec=model.transfer_batch_to_device,
+        side_effect=model.transfer_batch_to_device,
+    ) as mocked:
         copied_tensor = verification._get_input_array_copy(input_array=None)
         mocked.assert_called_once()
         assert copied_tensor.device == model.device == device
@@ -69,7 +72,7 @@ def test_verification_base_get_input_array(device):
 
 
 def test_verification_base_model_forward_for_input_array():
-    """ Test that the input_array is correctly fed to the forward method depending on its type. """
+    """Test that the input_array is correctly fed to the forward method depending on its type."""
     model = Mock()
     verification = TrivialVerification(model)
 

@@ -1,15 +1,15 @@
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Tuple, Type
 
-import pytorch_lightning as pl
 import torch
-from torch import nn, Tensor
+from pytorch_lightning import LightningModule, Trainer, seed_everything
+from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 
 
-class LinearRegression(pl.LightningModule):
+class LinearRegression(LightningModule):
     """
     Linear regression model implementing - with optional L1/L2 regularization
     $$min_{W} ||(Wx + b) - y ||_2^2 $$
@@ -54,7 +54,7 @@ class LinearRegression(pl.LightningModule):
 
         y_hat = self(x)
 
-        loss = F.mse_loss(y_hat, y, reduction='sum')
+        loss = F.mse_loss(y_hat, y, reduction="sum")
 
         # L1 regularizer
         if self.hparams.l1_strength > 0:
@@ -68,32 +68,32 @@ class LinearRegression(pl.LightningModule):
 
         loss /= x.size(0)
 
-        tensorboard_logs = {'train_mse_loss': loss}
+        tensorboard_logs = {"train_mse_loss": loss}
         progress_bar_metrics = tensorboard_logs
-        return {'loss': loss, 'log': tensorboard_logs, 'progress_bar': progress_bar_metrics}
+        return {"loss": loss, "log": tensorboard_logs, "progress_bar": progress_bar_metrics}
 
     def validation_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Dict[str, Tensor]:
         x, y = batch
         x = x.view(x.size(0), -1)
         y_hat = self(x)
-        return {'val_loss': F.mse_loss(y_hat, y)}
+        return {"val_loss": F.mse_loss(y_hat, y)}
 
     def validation_epoch_end(self, outputs: List[Dict[str, Tensor]]) -> Dict[str, Tensor]:
-        val_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'val_mse_loss': val_loss}
+        val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+        tensorboard_logs = {"val_mse_loss": val_loss}
         progress_bar_metrics = tensorboard_logs
-        return {'val_loss': val_loss, 'log': tensorboard_logs, 'progress_bar': progress_bar_metrics}
+        return {"val_loss": val_loss, "log": tensorboard_logs, "progress_bar": progress_bar_metrics}
 
     def test_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Dict[str, Tensor]:
         x, y = batch
         y_hat = self(x)
-        return {'test_loss': F.mse_loss(y_hat, y)}
+        return {"test_loss": F.mse_loss(y_hat, y)}
 
     def test_epoch_end(self, outputs: List[Dict[str, Tensor]]) -> Dict[str, Tensor]:
-        test_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'test_mse_loss': test_loss}
+        test_loss = torch.stack([x["test_loss"] for x in outputs]).mean()
+        tensorboard_logs = {"test_mse_loss": test_loss}
         progress_bar_metrics = tensorboard_logs
-        return {'test_loss': test_loss, 'log': tensorboard_logs, 'progress_bar': progress_bar_metrics}
+        return {"test_loss": test_loss, "log": tensorboard_logs, "progress_bar": progress_bar_metrics}
 
     def configure_optimizers(self) -> Optimizer:
         return self.optimizer(self.parameters(), lr=self.hparams.learning_rate)
@@ -101,11 +101,11 @@ class LinearRegression(pl.LightningModule):
     @staticmethod
     def add_model_specific_args(parent_parser: ArgumentParser) -> ArgumentParser:
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--learning_rate', type=float, default=0.0001)
-        parser.add_argument('--input_dim', type=int, default=None)
-        parser.add_argument('--output_dim', type=int, default=1)
-        parser.add_argument('--bias', default='store_true')
-        parser.add_argument('--batch_size', type=int, default=16)
+        parser.add_argument("--learning_rate", type=float, default=0.0001)
+        parser.add_argument("--input_dim", type=int, default=None)
+        parser.add_argument("--output_dim", type=int, default=1)
+        parser.add_argument("--bias", default="store_true")
+        parser.add_argument("--batch_size", type=int, default=16)
         return parser
 
 
@@ -113,20 +113,20 @@ def cli_main() -> None:
     from pl_bolts.datamodules.sklearn_datamodule import SklearnDataModule
     from pl_bolts.utils import _SKLEARN_AVAILABLE
 
-    pl.seed_everything(1234)
+    seed_everything(1234)
 
     # create dataset
     if _SKLEARN_AVAILABLE:
         from sklearn.datasets import load_diabetes
     else:  # pragma: no cover
         raise ModuleNotFoundError(
-            'You want to use `sklearn` which is not installed yet, install it with `pip install sklearn`.'
+            "You want to use `sklearn` which is not installed yet, install it with `pip install sklearn`."
         )
 
     # args
     parser = ArgumentParser()
     parser = LinearRegression.add_model_specific_args(parser)
-    parser = pl.Trainer.add_argparse_args(parser)
+    parser = Trainer.add_argparse_args(parser)
     args = parser.parse_args()
 
     # model
@@ -138,9 +138,9 @@ def cli_main() -> None:
     loaders = SklearnDataModule(X, y, batch_size=args.batch_size)
 
     # train
-    trainer = pl.Trainer.from_argparse_args(args)
+    trainer = Trainer.from_argparse_args(args)
     trainer.fit(model, train_dataloader=loaders.train_dataloader(), val_dataloaders=loaders.val_dataloader())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli_main()

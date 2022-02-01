@@ -1,9 +1,9 @@
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Tuple, Type
 
-import pytorch_lightning as pl
 import torch
-from torch import nn, Tensor
+from pytorch_lightning import LightningModule, Trainer, seed_everything
+from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.nn.functional import softmax
 from torch.optim import Adam
@@ -11,10 +11,8 @@ from torch.optim.optimizer import Optimizer
 from torchmetrics.functional import accuracy
 
 
-class LogisticRegression(pl.LightningModule):
-    """
-    Logistic regression model
-    """
+class LogisticRegression(LightningModule):
+    """Logistic regression model."""
 
     def __init__(
         self,
@@ -57,7 +55,7 @@ class LogisticRegression(pl.LightningModule):
         y_hat = self.linear(x)
 
         # PyTorch cross_entropy function combines log_softmax and nll_loss in single function
-        loss = F.cross_entropy(y_hat, y, reduction='sum')
+        loss = F.cross_entropy(y_hat, y, reduction="sum")
 
         # L1 regularizer
         if self.hparams.l1_strength > 0:
@@ -71,37 +69,37 @@ class LogisticRegression(pl.LightningModule):
 
         loss /= x.size(0)
 
-        tensorboard_logs = {'train_ce_loss': loss}
+        tensorboard_logs = {"train_ce_loss": loss}
         progress_bar_metrics = tensorboard_logs
-        return {'loss': loss, 'log': tensorboard_logs, 'progress_bar': progress_bar_metrics}
+        return {"loss": loss, "log": tensorboard_logs, "progress_bar": progress_bar_metrics}
 
     def validation_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Dict[str, Tensor]:
         x, y = batch
         x = x.view(x.size(0), -1)
         y_hat = self.linear(x)
         acc = accuracy(F.softmax(y_hat, -1), y)
-        return {'val_loss': F.cross_entropy(y_hat, y), 'acc': acc}
+        return {"val_loss": F.cross_entropy(y_hat, y), "acc": acc}
 
     def validation_epoch_end(self, outputs: List[Dict[str, Tensor]]) -> Dict[str, Tensor]:
-        acc = torch.stack([x['acc'] for x in outputs]).mean()
-        val_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'val_ce_loss': val_loss, 'val_acc': acc}
+        acc = torch.stack([x["acc"] for x in outputs]).mean()
+        val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+        tensorboard_logs = {"val_ce_loss": val_loss, "val_acc": acc}
         progress_bar_metrics = tensorboard_logs
-        return {'val_loss': val_loss, 'log': tensorboard_logs, 'progress_bar': progress_bar_metrics}
+        return {"val_loss": val_loss, "log": tensorboard_logs, "progress_bar": progress_bar_metrics}
 
     def test_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Dict[str, Tensor]:
         x, y = batch
         x = x.view(x.size(0), -1)
         y_hat = self.linear(x)
         acc = accuracy(F.softmax(y_hat, -1), y)
-        return {'test_loss': F.cross_entropy(y_hat, y), 'acc': acc}
+        return {"test_loss": F.cross_entropy(y_hat, y), "acc": acc}
 
     def test_epoch_end(self, outputs: List[Dict[str, Tensor]]) -> Dict[str, Tensor]:
-        acc = torch.stack([x['acc'] for x in outputs]).mean()
-        test_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'test_ce_loss': test_loss, 'test_acc': acc}
+        acc = torch.stack([x["acc"] for x in outputs]).mean()
+        test_loss = torch.stack([x["test_loss"] for x in outputs]).mean()
+        tensorboard_logs = {"test_ce_loss": test_loss, "test_acc": acc}
         progress_bar_metrics = tensorboard_logs
-        return {'test_loss': test_loss, 'log': tensorboard_logs, 'progress_bar': progress_bar_metrics}
+        return {"test_loss": test_loss, "log": tensorboard_logs, "progress_bar": progress_bar_metrics}
 
     def configure_optimizers(self) -> Optimizer:
         return self.optimizer(self.parameters(), lr=self.hparams.learning_rate)
@@ -109,11 +107,11 @@ class LogisticRegression(pl.LightningModule):
     @staticmethod
     def add_model_specific_args(parent_parser: ArgumentParser) -> ArgumentParser:
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--learning_rate', type=float, default=0.0001)
-        parser.add_argument('--input_dim', type=int, default=None)
-        parser.add_argument('--num_classes', type=int, default=None)
-        parser.add_argument('--bias', default='store_true')
-        parser.add_argument('--batch_size', type=int, default=16)
+        parser.add_argument("--learning_rate", type=float, default=0.0001)
+        parser.add_argument("--input_dim", type=int, default=None)
+        parser.add_argument("--num_classes", type=int, default=None)
+        parser.add_argument("--bias", default="store_true")
+        parser.add_argument("--batch_size", type=int, default=16)
         return parser
 
 
@@ -121,20 +119,20 @@ def cli_main() -> None:
     from pl_bolts.datamodules.sklearn_datamodule import SklearnDataModule
     from pl_bolts.utils import _SKLEARN_AVAILABLE
 
-    pl.seed_everything(1234)
+    seed_everything(1234)
 
     # Example: Iris dataset in Sklearn (4 features, 3 class labels)
     if _SKLEARN_AVAILABLE:
         from sklearn.datasets import load_iris
     else:  # pragma: no cover
         raise ModuleNotFoundError(
-            'You want to use `sklearn` which is not installed yet, install it with `pip install sklearn`.'
+            "You want to use `sklearn` which is not installed yet, install it with `pip install sklearn`."
         )
 
     # args
     parser = ArgumentParser()
     parser = LogisticRegression.add_model_specific_args(parser)
-    parser = pl.Trainer.add_argparse_args(parser)
+    parser = Trainer.add_argparse_args(parser)
     args = parser.parse_args()
 
     # model
@@ -146,9 +144,9 @@ def cli_main() -> None:
     loaders = SklearnDataModule(X, y, batch_size=args.batch_size, num_workers=0)
 
     # train
-    trainer = pl.Trainer.from_argparse_args(args)
+    trainer = Trainer.from_argparse_args(args)
     trainer.fit(model, train_dataloader=loaders.train_dataloader(), val_dataloaders=loaders.val_dataloader())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli_main()

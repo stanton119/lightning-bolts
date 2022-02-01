@@ -1,9 +1,9 @@
 import torch
+from torch import Tensor
 
 
-def iou(preds: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """
-    Calculates the intersection over union.
+def iou(preds: Tensor, target: Tensor) -> Tensor:
+    """Calculates the intersection over union.
 
     Args:
         preds: an Nx4 batch of prediction bounding boxes with representation ``[x_min, y_min, x_max, y_max]``
@@ -34,9 +34,8 @@ def iou(preds: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     return iou
 
 
-def giou(preds: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """
-    Calculates the generalized intersection over union.
+def giou(preds: Tensor, target: Tensor) -> Tensor:
+    """Calculates the generalized intersection over union.
 
     It has been proposed in `Generalized Intersection over Union: A Metric and A
     Loss for Bounding Box Regression <https://arxiv.org/abs/1902.09630>`_.

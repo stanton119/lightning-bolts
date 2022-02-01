@@ -1,8 +1,8 @@
 from argparse import ArgumentParser
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
-import pytorch_lightning as pl
 import torch
+from pytorch_lightning import LightningModule, Trainer, seed_everything
 
 from pl_bolts.models.detection.faster_rcnn import create_fasterrcnn_backbone
 from pl_bolts.utils import _TORCHVISION_AVAILABLE
@@ -10,19 +10,16 @@ from pl_bolts.utils.warnings import warn_missing_pkg
 
 if _TORCHVISION_AVAILABLE:
     from torchvision.models.detection.faster_rcnn import FasterRCNN as torchvision_FasterRCNN
-    from torchvision.models.detection.faster_rcnn import fasterrcnn_resnet50_fpn, FastRCNNPredictor
+    from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, fasterrcnn_resnet50_fpn
     from torchvision.ops import box_iou
 else:  # pragma: no cover
     warn_missing_pkg("torchvision")
 
 
 def _evaluate_iou(target, pred):
-    """
-    Evaluate intersection over union (IOU) for target from dataset and output prediction
-    from model
-    """
+    """Evaluate intersection over union (IOU) for target from dataset and output prediction from model."""
     if not _TORCHVISION_AVAILABLE:  # pragma: no cover
-        raise ModuleNotFoundError('You want to use `torchvision` which is not installed yet.')
+        raise ModuleNotFoundError("You want to use `torchvision` which is not installed yet.")
 
     if pred["boxes"].shape[0] == 0:
         # no box detected, 0 IOU
@@ -30,10 +27,9 @@ def _evaluate_iou(target, pred):
     return box_iou(target["boxes"], pred["boxes"]).diag().mean()
 
 
-class FasterRCNN(pl.LightningModule):
-    """
-    PyTorch Lightning implementation of `Faster R-CNN: Towards Real-Time Object Detection with
-    Region Proposal Networks <https://arxiv.org/abs/1506.01497>`_.
+class FasterRCNN(LightningModule):
+    """PyTorch Lightning implementation of `Faster R-CNN: Towards Real-Time Object Detection with Region Proposal
+    Networks <https://arxiv.org/abs/1506.01497>`_.
 
     Paper authors: Shaoqing Ren, Kaiming He, Ross Girshick, Jian Sun
 
@@ -47,14 +43,14 @@ class FasterRCNN(pl.LightningModule):
     CLI command::
 
         # PascalVOC
-        python faster_rcnn.py --gpus 1 --pretrained True
+        python faster_rcnn_module.py --gpus 1 --pretrained True
     """
 
     def __init__(
         self,
         learning_rate: float = 0.0001,
         num_classes: int = 91,
-        backbone: Optional[str] = None,
+        backbone: Optional[Union[str, torch.nn.Module]] = None,
         fpn: bool = True,
         pretrained: bool = False,
         pretrained_backbone: bool = True,
@@ -65,14 +61,14 @@ class FasterRCNN(pl.LightningModule):
         Args:
             learning_rate: the learning rate
             num_classes: number of detection classes (including background)
-            backbone: Pretained backbone CNN architecture.
+            backbone: Pretained backbone CNN architecture or torch.nn.Module instance.
             fpn: If True, creates a Feature Pyramind Network on top of Resnet based CNNs.
             pretrained: if true, returns a model pre-trained on COCO train2017
             pretrained_backbone: if true, returns a model with backbone pre-trained on Imagenet
             trainable_backbone_layers: number of trainable resnet layers starting from final block
         """
         if not _TORCHVISION_AVAILABLE:  # pragma: no cover
-            raise ModuleNotFoundError('You want to use `torchvision` which is not installed yet.')
+            raise ModuleNotFoundError("You want to use `torchvision` which is not installed yet.")
 
         super().__init__()
 
@@ -90,13 +86,23 @@ class FasterRCNN(pl.LightningModule):
             self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.num_classes)
 
         else:
-            backbone_model = create_fasterrcnn_backbone(
-                self.backbone,
-                fpn,
-                pretrained_backbone,
-                trainable_backbone_layers,
-                **kwargs,
-            )
+            if isinstance(self.backbone, torch.nn.Module):
+                backbone_model = self.backbone
+                if pretrained_backbone:
+                    import warnings
+
+                    warnings.warn(
+                        "You would need to load the pretrained state_dict yourself if you are "
+                        "providing backbone of type torch.nn.Module / pl.LightningModule."
+                    )
+            else:
+                backbone_model = create_fasterrcnn_backbone(
+                    self.backbone,
+                    fpn,
+                    pretrained_backbone,
+                    trainable_backbone_layers,
+                    **kwargs,
+                )
             self.model = torchvision_FasterRCNN(backbone_model, num_classes=num_classes, **kwargs)
 
     def forward(self, x):
@@ -149,11 +155,10 @@ class FasterRCNN(pl.LightningModule):
 def run_cli():
     from pl_bolts.datamodules import VOCDetectionDataModule
 
-    pl.seed_everything(42)
+    seed_everything(42)
     parser = ArgumentParser()
-    parser = pl.Trainer.add_argparse_args(parser)
-    parser.add_argument("--data_dir", type=str, default=".")
-    parser.add_argument("--batch_size", type=int, default=1)
+    parser = VOCDetectionDataModule.add_argparse_args(parser)
+    parser = Trainer.add_argparse_args(parser)
     parser = FasterRCNN.add_model_specific_args(parser)
 
     args = parser.parse_args()
@@ -162,7 +167,7 @@ def run_cli():
     args.num_classes = datamodule.num_classes
 
     model = FasterRCNN(**vars(args))
-    trainer = pl.Trainer.from_argparse_args(args)
+    trainer = Trainer.from_argparse_args(args)
     trainer.fit(model, datamodule=datamodule)
 
 
