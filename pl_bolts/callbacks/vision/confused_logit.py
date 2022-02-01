@@ -2,7 +2,7 @@ from typing import Sequence
 
 import torch
 from pytorch_lightning import Callback, LightningModule, Trainer
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 from pl_bolts.utils import _MATPLOTLIB_AVAILABLE
 from pl_bolts.utils.warnings import warn_missing_pkg
@@ -18,8 +18,7 @@ else:  # pragma: no cover
 
 
 class ConfusedLogitCallback(Callback):  # pragma: no cover
-    """
-    Takes the logit predictions of a model and when the probabilities of two classes are very close, the model
+    """Takes the logit predictions of a model and when the probabilities of two classes are very close, the model
     doesn't have high certainty that it should pick one vs the other class.
 
     This callback shows how the input would have to change to swing the model from one label prediction
@@ -50,10 +49,9 @@ class ConfusedLogitCallback(Callback):  # pragma: no cover
     def __init__(
         self,
         top_k: int,
-        projection_factor: int = 3,
         min_logit_value: float = 5.0,
         logging_batch_interval: int = 20,
-        max_logit_difference: float = 0.1
+        max_logit_difference: float = 0.1,
     ):
         """
         Args:
@@ -65,7 +63,6 @@ class ConfusedLogitCallback(Callback):  # pragma: no cover
         """
         super().__init__()
         self.top_k = top_k
-        self.projection_factor = projection_factor
         self.max_logit_difference = max_logit_difference
         self.logging_batch_interval = logging_batch_interval
         self.min_logit_value = min_logit_value
@@ -80,7 +77,7 @@ class ConfusedLogitCallback(Callback):  # pragma: no cover
         dataloader_idx: int,
     ) -> None:
         # show images only every 20 batches
-        if (trainer.batch_idx + 1) % self.logging_batch_interval != 0:  # type: ignore[attr-defined]
+        if (batch_idx + 1) % self.logging_batch_interval != 0:
             return
 
         # pick the last batch and logits
@@ -95,9 +92,9 @@ class ConfusedLogitCallback(Callback):  # pragma: no cover
             raise AttributeError(m) from err
 
         # only check when it has opinions (ie: the logit > 5)
-        if logits.max() > self.min_logit_value:  # type: ignore[operator]
+        if logits.max() > self.min_logit_value:
             # pick the top two confused probs
-            (values, idxs) = torch.topk(logits, k=2, dim=1)  # type: ignore[arg-type]
+            (values, idxs) = torch.topk(logits, k=2, dim=1)
 
             # care about only the ones that are at most eps close to each other
             eps = self.max_logit_difference
@@ -124,19 +121,19 @@ class ConfusedLogitCallback(Callback):  # pragma: no cover
     ) -> None:
         if not _MATPLOTLIB_AVAILABLE:  # pragma: no cover
             raise ModuleNotFoundError(
-                'You want to use `matplotlib` which is not installed yet, install it with `pip install matplotlib`.'
+                "You want to use `matplotlib` which is not installed yet, install it with `pip install matplotlib`."
             )
 
-        confusing_x = confusing_x[:self.top_k]
-        confusing_y = confusing_y[:self.top_k]
+        confusing_x = confusing_x[: self.top_k]
+        confusing_y = confusing_y[: self.top_k]
 
         x_param_a = nn.Parameter(confusing_x)
         x_param_b = nn.Parameter(confusing_x)
 
         batch_size, c, w, h = confusing_x.size()
         for logit_i, x_param in enumerate((x_param_a, x_param_b)):
-            x_param = x_param.to(model.device)  # type: ignore[assignment]
-            logits = model(x_param.view(batch_size, -1))
+            x_param = x_param.to(model.device)
+            logits = model(x_param)
             logits[:, mask_idxs[:, logit_i]].sum().backward()
 
         # reshape grads
@@ -152,13 +149,13 @@ class ConfusedLogitCallback(Callback):  # pragma: no cover
             mask_idx = mask_idxs[img_i].cpu()
 
             fig, axarr = plt.subplots(nrows=2, ncols=3, figsize=(15, 10))
-            self.__draw_sample(fig, axarr, 0, 0, x, f'True: {y}')
-            self.__draw_sample(fig, axarr, 0, 1, ga, f'd{mask_idx[0]}-logit/dx')
-            self.__draw_sample(fig, axarr, 0, 2, gb, f'd{mask_idx[1]}-logit/dx')
-            self.__draw_sample(fig, axarr, 1, 1, ga * 2 + x, f'd{mask_idx[0]}-logit/dx')
-            self.__draw_sample(fig, axarr, 1, 2, gb * 2 + x, f'd{mask_idx[1]}-logit/dx')
+            self.__draw_sample(fig, axarr, 0, 0, x, f"True: {y}")
+            self.__draw_sample(fig, axarr, 0, 1, ga, f"d{mask_idx[0]}-logit/dx")
+            self.__draw_sample(fig, axarr, 0, 2, gb, f"d{mask_idx[1]}-logit/dx")
+            self.__draw_sample(fig, axarr, 1, 1, ga * 2 + x, f"d{mask_idx[0]}-logit/dx")
+            self.__draw_sample(fig, axarr, 1, 2, gb * 2 + x, f"d{mask_idx[1]}-logit/dx")
 
-            trainer.logger.experiment.add_figure('confusing_imgs', fig, global_step=trainer.global_step)
+            trainer.logger.experiment.add_figure("confusing_imgs", fig, global_step=trainer.global_step)
 
     @staticmethod
     def __draw_sample(fig: Figure, axarr: Axes, row_idx: int, col_idx: int, img: Tensor, title: str) -> None:

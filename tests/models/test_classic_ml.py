@@ -1,6 +1,5 @@
 import numpy as np
-import pytorch_lightning as pl
-from pytorch_lightning import seed_everything
+from pytorch_lightning import Trainer, seed_everything
 from torch.utils.data import DataLoader
 
 from pl_bolts.datamodules import MNISTDataModule
@@ -20,7 +19,7 @@ def test_linear_regression_model(tmpdir):
     loader = DataLoader(SklearnDataset(X, y), batch_size=2)
 
     model = LinearRegression(input_dim=2, learning_rate=0.5)
-    trainer = pl.Trainer(
+    trainer = Trainer(
         max_epochs=300,
         default_root_dir=tmpdir,
         progress_bar_refresh_rate=0,
@@ -43,27 +42,27 @@ def test_linear_regression_model(tmpdir):
     trainer.test(model, loader)
 
 
-# def test_logistic_regression_model(tmpdir, datadir):
-#     pl.seed_everything(0)
+def test_logistic_regression_model(tmpdir, datadir):
+    seed_everything(0)
 
-#     # create dataset
-#     dm = MNISTDataModule(num_workers=0, data_dir=datadir)
+    # create dataset
+    dm = MNISTDataModule(num_workers=0, data_dir=datadir)
 
-#     model = LogisticRegression(input_dim=28 * 28, num_classes=10, learning_rate=0.001)
-#     model.prepare_data = dm.prepare_data
-#     model.setup = dm.setup
-#     model.train_dataloader = dm.train_dataloader
-#     model.val_dataloader = dm.val_dataloader
-#     model.test_dataloader = dm.test_dataloader
+    model = LogisticRegression(input_dim=28 * 28, num_classes=10, learning_rate=0.001)
+    model.prepare_data = dm.prepare_data
+    model.setup = dm.setup
+    model.train_dataloader = dm.train_dataloader
+    model.val_dataloader = dm.val_dataloader
+    model.test_dataloader = dm.test_dataloader
 
-#     trainer = pl.Trainer(
-#         max_epochs=3,
-#         default_root_dir=tmpdir,
-#         progress_bar_refresh_rate=0,
-#         logger=False,
-#         checkpoint_callback=False,
-#     )
-#     trainer.fit(model)
-#     trainer.test(model)
-#     # todo: update model and add healthy check
-#     # assert trainer.progress_bar_dict['test_acc'] >= 0.9
+    trainer = Trainer(
+        max_epochs=3,
+        default_root_dir=tmpdir,
+        progress_bar_refresh_rate=0,
+        logger=False,
+        checkpoint_callback=False,
+    )
+    trainer.fit(model)
+    trainer.test(model)
+    # todo: update model and add healthy check
+    # assert trainer.progress_bar_dict['test_acc'] >= 0.9

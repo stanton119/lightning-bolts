@@ -1,10 +1,9 @@
 import pytest
-import pytorch_lightning as pl
 import torch
-from pytorch_lightning import seed_everything
+from pytorch_lightning import Trainer, seed_everything
 
 from pl_bolts.datamodules import CIFAR10DataModule
-from pl_bolts.models.autoencoders import AE, resnet18_decoder, resnet18_encoder, resnet50_encoder, VAE
+from pl_bolts.models.autoencoders import AE, VAE, resnet18_decoder, resnet18_encoder, resnet50_encoder
 
 
 @pytest.mark.parametrize("dm_cls", [pytest.param(CIFAR10DataModule, id="cifar10")])
@@ -13,7 +12,7 @@ def test_vae(tmpdir, datadir, dm_cls):
 
     dm = dm_cls(data_dir=datadir, batch_size=4)
     model = VAE(input_height=dm.size()[-1])
-    trainer = pl.Trainer(
+    trainer = Trainer(
         fast_dev_run=True,
         default_root_dir=tmpdir,
         gpus=None,
@@ -28,7 +27,7 @@ def test_ae(tmpdir, datadir, dm_cls):
 
     dm = dm_cls(data_dir=datadir, batch_size=4)
     model = AE(input_height=dm.size()[-1])
-    trainer = pl.Trainer(
+    trainer = Trainer(
         fast_dev_run=True,
         default_root_dir=tmpdir,
         gpus=None,
@@ -90,16 +89,16 @@ def test_from_pretrained(datadir):
     exception_raised = False
 
     try:
-        vae = vae.from_pretrained('cifar10-resnet18')
+        vae = vae.from_pretrained("cifar10-resnet18")
 
         # test forward method on pre-trained weights
         for x, y in data_loader:
             vae(x)
             break
 
-        vae = vae.from_pretrained('stl10-resnet18')  # try loading weights not compatible with exact architecture
+        vae = vae.from_pretrained("stl10-resnet18")  # try loading weights not compatible with exact architecture
 
-        ae = ae.from_pretrained('cifar10-resnet18')
+        ae = ae.from_pretrained("cifar10-resnet18")
 
         # test forward method on pre-trained weights
         with torch.no_grad():
@@ -115,8 +114,8 @@ def test_from_pretrained(datadir):
     keyerror = False
 
     try:
-        vae.from_pretrained('abc')
-        ae.from_pretrained('xyz')
+        vae.from_pretrained("abc")
+        ae.from_pretrained("xyz")
     except KeyError:
         keyerror = True
 

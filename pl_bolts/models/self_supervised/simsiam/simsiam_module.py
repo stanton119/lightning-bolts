@@ -1,8 +1,7 @@
 from argparse import ArgumentParser
 
-import pytorch_lightning as pl
 import torch
-from pytorch_lightning import seed_everything
+from pytorch_lightning import LightningModule, Trainer, seed_everything
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from torch.nn import functional as F
 
@@ -17,10 +16,8 @@ from pl_bolts.transforms.dataset_normalizations import (
 )
 
 
-class SimSiam(pl.LightningModule):
-    """
-    PyTorch Lightning implementation of `Exploring Simple Siamese Representation Learning (SimSiam)
-    <https://arxiv.org/pdf/2011.10566v1.pdf>`_
+class SimSiam(LightningModule):
+    """PyTorch Lightning implementation of Exploring Simple Siamese Representation Learning (SimSiam_)
 
     Paper authors: Xinlei Chen, Kaiming He.
 
@@ -42,7 +39,7 @@ class SimSiam(pl.LightningModule):
         dm.train_transforms = SimCLRTrainDataTransform(32)
         dm.val_transforms = SimCLREvalDataTransform(32)
 
-        trainer = pl.Trainer()
+        trainer = Trainer()
         trainer.fit(model, datamodule=dm)
 
     Train::
@@ -62,6 +59,8 @@ class SimSiam(pl.LightningModule):
             --data_dir /path/to/imagenet/
             --meta_dir /path/to/folder/with/meta.bin/
             --batch_size 32
+
+    .. _SimSiam: https://arxiv.org/pdf/2011.10566v1.pdf
     """
 
     def __init__(
@@ -71,7 +70,7 @@ class SimSiam(pl.LightningModule):
         batch_size: int,
         dataset: str,
         num_nodes: int = 1,
-        arch: str = 'resnet50',
+        arch: str = "resnet50",
         hidden_mlp: int = 2048,
         feat_dim: int = 128,
         warmup_epochs: int = 10,
@@ -79,11 +78,11 @@ class SimSiam(pl.LightningModule):
         temperature: float = 0.1,
         first_conv: bool = True,
         maxpool1: bool = True,
-        optimizer: str = 'adam',
+        optimizer: str = "adam",
         exclude_bn_bias: bool = False,
-        start_lr: float = 0.,
+        start_lr: float = 0.0,
         learning_rate: float = 1e-3,
-        final_lr: float = 0.,
+        final_lr: float = 0.0,
         weight_decay: float = 1e-6,
         **kwargs
     ):
@@ -133,9 +132,9 @@ class SimSiam(pl.LightningModule):
         self.train_iters_per_epoch = self.num_samples // global_batch_size
 
     def init_model(self):
-        if self.arch == 'resnet18':
+        if self.arch == "resnet18":
             backbone = resnet18
-        elif self.arch == 'resnet50':
+        elif self.arch == "resnet50":
             backbone = resnet50
 
         encoder = backbone(first_conv=self.first_conv, maxpool1=self.maxpool1, return_all_feature_maps=False)
@@ -180,7 +179,7 @@ class SimSiam(pl.LightningModule):
 
         return loss
 
-    def exclude_from_wt_decay(self, named_params, weight_decay, skip_list=['bias', 'bn']):
+    def exclude_from_wt_decay(self, named_params, weight_decay, skip_list=("bias", "bn")):
         params = []
         excluded_params = []
 
@@ -193,14 +192,8 @@ class SimSiam(pl.LightningModule):
                 params.append(param)
 
         return [
-            {
-                'params': params,
-                'weight_decay': weight_decay
-            },
-            {
-                'params': excluded_params,
-                'weight_decay': 0.
-            },
+            {"params": params, "weight_decay": weight_decay},
+            {"params": excluded_params, "weight_decay": 0.0},
         ]
 
     def configure_optimizers(self):
@@ -209,7 +202,7 @@ class SimSiam(pl.LightningModule):
         else:
             params = self.parameters()
 
-        if self.optim == 'lars':
+        if self.optim == "lars":
             optimizer = LARS(
                 params,
                 lr=self.learning_rate,
@@ -217,7 +210,7 @@ class SimSiam(pl.LightningModule):
                 weight_decay=self.weight_decay,
                 trust_coefficient=0.001,
             )
-        elif self.optim == 'adam':
+        elif self.optim == "adam":
             optimizer = torch.optim.Adam(params, lr=self.learning_rate, weight_decay=self.weight_decay)
 
         warmup_steps = self.train_iters_per_epoch * self.warmup_epochs
@@ -279,7 +272,7 @@ def cli_main():
     parser = ArgumentParser()
 
     # trainer args
-    parser = pl.Trainer.add_argparse_args(parser)
+    parser = Trainer.add_argparse_args(parser)
 
     # model args
     parser = SimSiam.add_model_specific_args(parser)
@@ -383,11 +376,11 @@ def cli_main():
         )
 
     lr_monitor = LearningRateMonitor(logging_interval="step")
-    model_checkpoint = ModelCheckpoint(save_last=True, save_top_k=1, monitor='val_loss')
+    model_checkpoint = ModelCheckpoint(save_last=True, save_top_k=1, monitor="val_loss")
     callbacks = [model_checkpoint, online_evaluator] if args.online_ft else [model_checkpoint]
     callbacks.append(lr_monitor)
 
-    trainer = pl.Trainer.from_argparse_args(
+    trainer = Trainer.from_argparse_args(
         args,
         sync_batchnorm=True if args.gpus > 1 else False,
         callbacks=callbacks,

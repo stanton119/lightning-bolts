@@ -1,8 +1,10 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+import os
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader
+from torch import Tensor
+from torch.utils.data import DataLoader, Dataset
 
 from pl_bolts.utils import _TORCHVISION_AVAILABLE
 from pl_bolts.utils.warnings import warn_missing_pkg
@@ -11,19 +13,17 @@ if _TORCHVISION_AVAILABLE:
     from torchvision import transforms as transform_lib
     from torchvision.datasets import VOCDetection
 else:  # pragma: no cover
-    warn_missing_pkg('torchvision')
+    warn_missing_pkg("torchvision")
 
 
-class Compose(object):
-    """
-    Like `torchvision.transforms.compose` but works for (image, target)
-    """
+class Compose:
+    """Like `torchvision.transforms.compose` but works for (image, target)"""
 
     def __init__(self, transforms: List[Callable], image_transforms: Optional[Callable] = None) -> None:
         self.transforms = transforms
         self.image_transforms = image_transforms
 
-    def __call__(self, image: Any, target: Any) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, image: Any, target: Any) -> Tuple[Tensor, Tensor]:
         for t in self.transforms:
             image, target = t(image, target)
         if self.image_transforms:
@@ -31,7 +31,7 @@ class Compose(object):
         return image, target
 
 
-def _collate_fn(batch: List[torch.Tensor]) -> tuple:
+def _collate_fn(batch: List[Tensor]) -> tuple:
     return tuple(zip(*batch))
 
 
@@ -61,8 +61,7 @@ CLASSES = (
 
 
 def _prepare_voc_instance(image: Any, target: Dict[str, Any]):
-    """
-    Prepares VOC dataset into appropriate target for fasterrcnn
+    """Prepares VOC dataset into appropriate target for fasterrcnn.
 
     https://github.com/pytorch/vision/issues/1097#issuecomment-508917489
     """
@@ -103,35 +102,35 @@ def _prepare_voc_instance(image: Any, target: Dict[str, Any]):
 
 
 class VOCDetectionDataModule(LightningDataModule):
-    """
-    TODO(teddykoker) docstring
-    """
+    """TODO(teddykoker) docstring."""
 
     name = "vocdetection"
 
     def __init__(
         self,
-        data_dir: str,
+        data_dir: Optional[str] = None,
         year: str = "2012",
-        num_workers: int = 16,
+        num_workers: int = 0,
         normalize: bool = False,
-        shuffle: bool = False,
-        pin_memory: bool = False,
+        batch_size: int = 16,
+        shuffle: bool = True,
+        pin_memory: bool = True,
         drop_last: bool = False,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         if not _TORCHVISION_AVAILABLE:  # pragma: no cover
             raise ModuleNotFoundError(
-                'You want to use VOC dataset loaded from `torchvision` which is not installed yet.'
+                "You want to use VOC dataset loaded from `torchvision` which is not installed yet."
             )
 
         super().__init__(*args, **kwargs)
 
         self.year = year
-        self.data_dir = data_dir
+        self.data_dir = data_dir if data_dir is not None else os.getcwd()
         self.num_workers = num_workers
         self.normalize = normalize
+        self.batch_size = batch_size
         self.shuffle = shuffle
         self.pin_memory = pin_memory
         self.drop_last = drop_last
@@ -145,66 +144,54 @@ class VOCDetectionDataModule(LightningDataModule):
         return 21
 
     def prepare_data(self) -> None:
-        """
-        Saves VOCDetection files to data_dir
-        """
+        """Saves VOCDetection files to data_dir."""
         VOCDetection(self.data_dir, year=self.year, image_set="train", download=True)
         VOCDetection(self.data_dir, year=self.year, image_set="val", download=True)
 
-    def train_dataloader(
-        self, batch_size: int = 1, image_transforms: Union[List[Callable], Callable] = None
-    ) -> DataLoader:
-        """
-        VOCDetection train set uses the `train` subset
+    def train_dataloader(self, image_transforms: Optional[Callable] = None) -> DataLoader:
+        """VOCDetection train set uses the `train` subset.
 
         Args:
-            batch_size: size of batch
-            transforms: custom transforms
+            image_transforms: custom image-only transforms
         """
-        transforms = [_prepare_voc_instance]
-        image_transforms = image_transforms or self.train_transforms or self._default_transforms()
+        transforms = [
+            _prepare_voc_instance,
+            self.default_transforms() if self.train_transforms is None else self.train_transforms,
+        ]
         transforms = Compose(transforms, image_transforms)
+
         dataset = VOCDetection(self.data_dir, year=self.year, image_set="train", transforms=transforms)
-        loader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=self.shuffle,
-            num_workers=self.num_workers,
-            drop_last=self.drop_last,
-            pin_memory=self.pin_memory,
-            collate_fn=_collate_fn,
-        )
-        return loader
+        return self._data_loader(dataset, shuffle=self.shuffle)
 
-    def val_dataloader(self, batch_size: int = 1, image_transforms: Optional[List[Callable]] = None) -> DataLoader:
-        """
-        VOCDetection val set uses the `val` subset
+    def val_dataloader(self, image_transforms: Optional[Callable] = None) -> DataLoader:
+        """VOCDetection val set uses the `val` subset.
 
         Args:
-            batch_size: size of batch
-            transforms: custom transforms
+            image_transforms: custom image-only transforms
         """
-        transforms = [_prepare_voc_instance]
-        image_transforms = image_transforms or self.train_transforms or self._default_transforms()
+        transforms = [
+            _prepare_voc_instance,
+            self.default_transforms() if self.val_transforms is None else self.val_transforms,
+        ]
         transforms = Compose(transforms, image_transforms)
+
         dataset = VOCDetection(self.data_dir, year=self.year, image_set="val", transforms=transforms)
-        loader = DataLoader(
+        return self._data_loader(dataset, shuffle=False)
+
+    def default_transforms(self) -> Callable:
+        voc_transforms = [transform_lib.ToTensor()]
+        if self.normalize:
+            voc_transforms += [transform_lib.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+        voc_transforms = transform_lib.Compose(voc_transforms)
+        return lambda image, target: (voc_transforms(image), target)
+
+    def _data_loader(self, dataset: Dataset, shuffle: bool = False) -> DataLoader:
+        return DataLoader(
             dataset,
-            batch_size=batch_size,
-            shuffle=False,
+            batch_size=self.batch_size,
+            shuffle=shuffle,
             num_workers=self.num_workers,
             drop_last=self.drop_last,
             pin_memory=self.pin_memory,
             collate_fn=_collate_fn,
         )
-        return loader
-
-    def _default_transforms(self) -> Callable:
-        if self.normalize:
-            voc_transforms = transform_lib.Compose([
-                transform_lib.ToTensor(),
-                transform_lib.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
-        else:
-            voc_transforms = transform_lib.Compose([transform_lib.ToTensor()])
-        return voc_transforms
